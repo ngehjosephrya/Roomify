@@ -59,6 +59,8 @@ const Upload = ({ onComplete }: UploadProps) => {
         if (typeof base64 !== "string") {
           console.error("Unable to read file as Base64.");
           return;
+          setFile(null);
+          setProgress(0);
         }
 
         if (progressIntervalRef.current !== null) {
@@ -87,6 +89,8 @@ const Upload = ({ onComplete }: UploadProps) => {
 
       reader.onerror = () => {
         console.error("FileReader failed to read the file.");
+        setFile(null);
+        setProgress(0);
       };
 
       reader.readAsDataURL(selectedFile);
