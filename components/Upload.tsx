@@ -16,6 +16,7 @@ const Upload = ({ onComplete }: UploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const progressIntervalRef = useRef<number | null>(null);
+  const redirectTimeoutRef = useRef<number | null>(null);
 
   const { isSignedIn } = useOutletContext<AuthContext>();
 
@@ -24,51 +25,74 @@ const Upload = ({ onComplete }: UploadProps) => {
       if (progressIntervalRef.current !== null) {
         window.clearInterval(progressIntervalRef.current);
       }
+      if (redirectTimeoutRef.current !== null) {
+        window.clearTimeout(redirectTimeoutRef.current);
+      }
     };
   }, []);
+  const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+  const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/jpg"]);
 
-  const processFile = useCallback((selectedFile: File) => {
-    if (!isSignedIn) return;
+  const processFile = useCallback(
+    (selectedFile: File) => {
+      if (!isSignedIn) return;
 
-    setFile(selectedFile);
-    setProgress(0);
-
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (typeof base64 !== "string") {
-        console.error("Unable to read file as Base64.");
+      if (!ALLOWED_UPLOAD_TYPES.has(selectedFile.type)) {
+        console.error("Only JPG, PNG and JPEG files are supported.");
         return;
       }
 
-      if (progressIntervalRef.current !== null) {
-        window.clearInterval(progressIntervalRef.current);
+      if (selectedFile.size > MAX_UPLOAD_SIZE_BYTES) {
+        console.error("File exceeds 50MB limit.");
+        return;
       }
 
-      progressIntervalRef.current = window.setInterval(() => {
-        setProgress((current) => {
-          const nextProgress = Math.min(current + PROGRESS_INCREMENT, 100);
+      setFile(selectedFile);
+      setProgress(0);
+      setFile(selectedFile);
+      setProgress(0);
 
-          if (nextProgress === 100 && progressIntervalRef.current !== null) {
-            window.clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-            window.setTimeout(() => {
-              onComplete(base64);
-            }, REDIRECT_DELAY_MS);
-          }
+      const reader = new FileReader();
 
-          return nextProgress;
-        });
-      }, PROGRESS_INTERVAL_MS);
-    };
+      reader.onload = (event) => {
+        const base64 = event.target?.result;
+        if (typeof base64 !== "string") {
+          console.error("Unable to read file as Base64.");
+          return;
+        }
 
-    reader.onerror = () => {
-      console.error("FileReader failed to read the file.");
-    };
+        if (progressIntervalRef.current !== null) {
+          window.clearInterval(progressIntervalRef.current);
+        }
 
-    reader.readAsDataURL(selectedFile);
-  }, [isSignedIn, onComplete]);
+        progressIntervalRef.current = window.setInterval(() => {
+          setProgress((current) => {
+            const nextProgress = Math.min(current + PROGRESS_INCREMENT, 100);
+
+            if (nextProgress === 100 && progressIntervalRef.current !== null) {
+              window.clearInterval(progressIntervalRef.current);
+              progressIntervalRef.current = null;
+              if(redirectTimeoutRef.current !== null){
+                window.clearTimeout(redirectTimeoutRef.current);
+              }
+              redirectTimeoutRef.current = window.setTimeout(() => {
+                onComplete(base64);
+              }, REDIRECT_DELAY_MS);
+            }
+
+            return nextProgress;
+          });
+        }, PROGRESS_INTERVAL_MS);
+      };
+
+      reader.onerror = () => {
+        console.error("FileReader failed to read the file.");
+      };
+
+      reader.readAsDataURL(selectedFile);
+    },
+    [isSignedIn, onComplete],
+  );
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!isSignedIn) {
