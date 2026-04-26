@@ -61,7 +61,7 @@ interface VisualizerProps {
     onUnshare?: (image: string) => Promise<void> | void;
     projectName?: string;
     projectId?: string;
-    initialRender?: string | null;
+    initialRendered?: string | null;
     isPublic?: boolean;
     sharedBy?: string | null;
     canUnshare?: boolean;
